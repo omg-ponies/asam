@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Solklick</title>
+  <title>Always Summer</title>
   <style>
     :root {
       --cell: 64;
+      --lightness: 0; /* start helt mörkt */
     }
 
     html, body {
@@ -15,9 +16,17 @@
     }
 
     body {
-      background: #000;
+      /* Start helt svart, ljusna gradvis mot nordisk soluppgång */
+      background: linear-gradient(
+        to bottom,
+        hsl(0, 0%, calc(0% + var(--lightness) * 0.2%)),   /* svart -> lite blåton */
+        hsl(220, 40%, calc(0% + var(--lightness) * 0.4%)), /* midnattsblå blir ljusare */
+        hsl(200, 60%, calc(0% + var(--lightness) * 0.6%)), /* kall blå/grå */
+        hsl(40, 80%, calc(0% + var(--lightness) * 0.8%))   /* varmt gult vid horisonten */
+      );
       overflow: hidden;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Emoji, Noto Color Emoji, Apple Color Emoji, sans-serif;
+      transition: background 1s ease;
     }
 
     .canvas {
@@ -45,6 +54,11 @@
     (function () {
       const canvas = document.getElementById('canvas');
       const cell = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cell'));
+      let lightness = 0; // hur ljust det är, max 100
+
+      function updateBackground() {
+        document.documentElement.style.setProperty('--lightness', lightness);
+      }
 
       function snapToGrid(x, y) {
         const col = Math.floor(x / cell);
@@ -67,6 +81,13 @@
         span.style.top = sy + 'px';
         span.textContent = '☀️';
         canvas.appendChild(span);
+
+        // Gör bakgrunden lite ljusare
+        if (lightness < 100) {
+          lightness += 5; // öka 5 per sol
+          if (lightness > 100) lightness = 100;
+          updateBackground();
+        }
       }
 
       canvas.addEventListener('click', (e) => {
@@ -79,10 +100,15 @@
         placeSun(t.clientX, t.clientY);
       }, { passive: true });
 
-      // Rensa allt med R
       window.addEventListener('keydown', (e) => {
-        if (e.key.toLowerCase() === 'r') canvas.innerHTML = '';
+        if (e.key.toLowerCase() === 'r') {
+          canvas.innerHTML = '';
+          lightness = 0;
+          updateBackground();
+        }
       });
+
+      updateBackground();
     })();
   </script>
 </body>

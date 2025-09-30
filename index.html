@@ -7,14 +7,21 @@
   <style>
     html,body{height:100%;margin:0}
     body{background:#000}
-    video{position:fixed;top:50%;left:50%;min-width:100%;min-height:100%;transform:translate(-50%,-50%);object-fit:cover;}
+    .stage{position:fixed;inset:0;overflow:hidden}
+    video{position:absolute;top:50%;left:50%;min-width:100%;min-height:100%;transform:translate(-50%,-50%);object-fit:cover}
+    .fade{opacity:0;transition:opacity 250ms ease}
+    .show{opacity:1}
   </style>
 </head>
 <body>
-  <video id="bg" playsinline muted autoplay preload="metadata"></video>
+  <div class="stage" aria-hidden="true">
+    <!-- two-tag approach for smooth, reliable switching -->
+    <video id="v0" class="fade show" playsinline muted autoplay preload="auto"></video>
+    <video id="v1" class="fade" playsinline muted preload="auto"></video>
+  </div>
 
   <script>
-    const videos = [
+    const sources = [
       'video/vid-00.mp4',
       'video/vid-01.mp4',
       'video/vid-02.mp4',
@@ -23,33 +30,83 @@
       'video/vid-05.mp4',
     ];
 
-    const el = document.getElementById('bg');
-    let idx = 0;
+    const A = document.getElementById('v0');
+    const B = document.getElementById('v1');
 
-    function addTapToPlay(){
-      if (document.getElementById('tap')) return;
-      const btn = document.createElement('button');
-      btn.id = 'tap';
-      btn.textContent = 'Tap to play';
-      Object.assign(btn.style, { position:'fixed', inset:'0', margin:'auto', height:'48px', width:'180px',
-        border:'1px solid #fff', background:'transparent', color:'#fff', cursor:'pointer', zIndex:11 });
-      btn.addEventListener('click', async ()=>{
-        try { await el.play(); document.body.removeChild(btn); } catch {}
+    // iOS safety: ensure flags are set via JS before play
+    [A,B].forEach(v=>{ v.muted = true; v.setAttribute('muted',''); v.setAttribute('playsinline',''); v.setAttribute('webkit-playsinline',''); });
+
+    let idx = 0;     // index of the clip that will be/just started playing on "live"
+    let live = A;    // visible video
+    let next = B;    // hidden, preloading next
+
+    // Load a src and resolve when it's ready to play without user gesture
+    function loadSrc(el, src){
+      return new Promise((resolve, reject)=>{
+        function cleanup(){ el.removeEventListener('canplay',onReady); el.removeEventListener('loadeddata',onReady); el.removeEventListener('error',onErr); }
+        function onReady(){ cleanup(); resolve(); }
+        function onErr(e){ cleanup(); reject(e); }
+        el.pause();
+        el.removeAttribute('src');
+        el.load();
+        el.src = src;
+        // Safari sometimes needs a tiny tick before it fires readiness
+        setTimeout(()=>{
+          if (el.readyState >= 2) resolve();
+        }, 0);
+        el.addEventListener('canplay', onReady, { once:true });
+        el.addEventListener('loadeddata', onReady, { once:true });
+        el.addEventListener('error', onErr, { once:true });
       });
-      document.body.appendChild(btn);
     }
 
-    function playAt(i){
-      idx = i % videos.length;
-      el.pause();
-      el.removeAttribute('src');
-      el.load();
-      el.src = videos[idx];
-      el.play().catch(addTapToPlay);
+    async function play(el){
+      try {
+        await el.play();
+      } catch (e) {
+        // If autoplay is blocked (shouldn't since muted), show a simple tap-to-play overlay once
+        if (!document.getElementById('tap')) {
+          const btn = document.createElement('button');
+          btn.id = 'tap';
+          btn.textContent = 'Play video';
+          Object.assign(btn.style, { position:'fixed', inset:'0', margin:'auto', height:'48px', width:'180px', border:'1px solid #fff', background:'transparent', color:'#fff', cursor:'pointer', zIndex:11 });
+          btn.onclick = async ()=>{ try{ await el.play(); btn.remove(); } catch(_){} };
+          document.body.appendChild(btn);
+        }
+      }
     }
 
-    el.addEventListener('ended', ()=> playAt(idx + 1));
-    playAt(0);
+    function nextIndex(i){ return (i + 1) % sources.length; }
+
+    async function start(){
+      // Load first clip into live and start
+      await loadSrc(live, sources[idx]);
+      await play(live);
+      // Pre-cue the following clip in the hidden tag
+      const following = nextIndex(idx);
+      await loadSrc(next, sources[following]);
+
+      live.addEventListener('ended', onEnded);
+    }
+
+    async function onEnded(){
+      // Swap visibility with a small fade for smoothness
+      next.classList.add('show');
+      live.classList.remove('show');
+
+      // Swap refs
+      const temp = live; live = next; next = temp;
+
+      // Advance index to the one we just made visible
+      idx = nextIndex(idx);
+      await play(live);
+
+      // Prepare the subsequent clip in the now-hidden element
+      const upcoming = nextIndex(idx);
+      try { await loadSrc(next, sources[upcoming]); } catch {}
+    }
+
+    start();
   </script>
 </body>
 </html>

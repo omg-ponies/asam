@@ -1,115 +1,55 @@
-<!DOCTYPE html>
-<html lang="sv">
+<!doctype html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Always Summer</title>
   <style>
-    :root {
-      --cell: 64;
-      --lightness: 0; /* start helt mörkt */
-    }
-
-    html, body {
-      height: 100%;
-      margin: 0;
-    }
-
-    body {
-      /* Start helt svart, ljusna gradvis */
-      background: linear-gradient(
-        to bottom,
-        hsl(0, 0%, calc(0% + var(--lightness) * 0.2%)),   /* svart -> lite blåton */
-        hsl(220, 40%, calc(0% + var(--lightness) * 0.4%)), /* midnattsblå blir ljusare */
-        hsl(200, 60%, calc(0% + var(--lightness) * 0.6%)), /* kall blå/grå */
-        hsl(40, 80%, calc(0% + var(--lightness) * 0.8%))   /* varmt gult vid horisonten */
-      );
-      overflow: hidden;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Emoji, Noto Color Emoji, Apple Color Emoji, sans-serif;
-      transition: background 1s ease;
-    }
-
-    .canvas {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      user-select: none;
-      -webkit-user-select: none;
-      -ms-user-select: none;
-    }
-
-    .sun {
-      position: absolute;
-      transform: translate(-50%, -50%);
-      line-height: 1;
-      pointer-events: none;
-      filter: drop-shadow(0 0 6px rgba(255, 210, 0, 0.35));
-    }
+    html,body{height:100%;margin:0}
+    body{background:#000}
+    video{position:fixed;top:50%;left:50%;min-width:100%;min-height:100%;transform:translate(-50%,-50%);object-fit:cover;}
   </style>
 </head>
 <body>
-  <div class="canvas" id="canvas" aria-label="Always Summer"></div>
+  <video id="bg" playsinline muted autoplay preload="metadata"></video>
 
   <script>
-    (function () {
-      const canvas = document.getElementById('canvas');
-      const cell = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cell'));
-      let lightness = 0; // hur ljust det är, max 100
+    const videos = [
+      'video/vid-00.mp4',
+      'video/vid-01.mp4',
+      'video/vid-02.mp4',
+      'video/vid-03.mp4',
+      'video/vid-04.mp4',
+      'video/vid-05.mp4',
+    ];
 
-      function updateBackground() {
-        document.documentElement.style.setProperty('--lightness', lightness);
-      }
+    const el = document.getElementById('bg');
+    let idx = 0;
 
-      function snapToGrid(x, y) {
-        const col = Math.floor(x / cell);
-        const row = Math.floor(y / cell);
-        const cx = col * cell + cell / 2;
-        const cy = row * cell + cell / 2;
-        return { x: cx, y: cy };
-      }
-
-      function placeSun(clientX, clientY) {
-        const rect = canvas.getBoundingClientRect();
-        const x = clientX - rect.left;
-        const y = clientY - rect.top;
-        const { x: sx, y: sy } = snapToGrid(x, y);
-
-        const span = document.createElement('span');
-        span.className = 'sun';
-        span.style.fontSize = Math.round(cell * 0.8) + 'px';
-        span.style.left = sx + 'px';
-        span.style.top = sy + 'px';
-        span.textContent = '☀️';
-        canvas.appendChild(span);
-
-        // Gör bakgrunden lite ljusare
-        if (lightness < 100) {
-          lightness += 5; // öka 5 per sol
-          if (lightness > 100) lightness = 100;
-          updateBackground();
-        }
-      }
-
-      canvas.addEventListener('click', (e) => {
-        placeSun(e.clientX, e.clientY);
+    function addTapToPlay(){
+      if (document.getElementById('tap')) return;
+      const btn = document.createElement('button');
+      btn.id = 'tap';
+      btn.textContent = 'Tap to play';
+      Object.assign(btn.style, { position:'fixed', inset:'0', margin:'auto', height:'48px', width:'180px',
+        border:'1px solid #fff', background:'transparent', color:'#fff', cursor:'pointer', zIndex:11 });
+      btn.addEventListener('click', async ()=>{
+        try { await el.play(); document.body.removeChild(btn); } catch {}
       });
+      document.body.appendChild(btn);
+    }
 
-      canvas.addEventListener('touchstart', (e) => {
-        const t = e.touches[0];
-        if (!t) return;
-        placeSun(t.clientX, t.clientY);
-      }, { passive: true });
+    function playAt(i){
+      idx = i % videos.length;
+      el.pause();
+      el.removeAttribute('src');
+      el.load();
+      el.src = videos[idx];
+      el.play().catch(addTapToPlay);
+    }
 
-      window.addEventListener('keydown', (e) => {
-        if (e.key.toLowerCase() === 'r') {
-          canvas.innerHTML = '';
-          lightness = 0;
-          updateBackground();
-        }
-      });
-
-      updateBackground();
-    })();
+    el.addEventListener('ended', ()=> playAt(idx + 1));
+    playAt(0);
   </script>
 </body>
 </html>

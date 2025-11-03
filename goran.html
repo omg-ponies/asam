@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Always Summer</title>
-  <!-- Techy mono font with tabular digits -->
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <style>
     html,body{height:100%;margin:0}
@@ -25,38 +24,33 @@
       aspect-ratio:16/9;
       display:flex;align-items:center;justify-content:center;
       border:1px solid rgba(255,255,255,0.18);
-      border-radius:12px;
+      border-radius:16px;
       background:rgba(0,0,0,0.45);
       transform:translate(-50%,-50%);
-      /* padding around numbers */
-      padding:3vh 3vw;
+      padding:3.5vh 4vw; /* extra padding */
       text-align:center;
     }
 
     #countdown{
       width:100%;
-      line-height:1.25;
-      /* responsive size, clamps for large/small screens */
+      line-height:1.35;
       font-size:clamp(18px, 3.2vw, 40px);
       letter-spacing:0.02em;
-      /* tabular digits for steady alignment */
       font-variant-numeric: tabular-nums;
-      font-feature-settings: "tnum" 1, "ss01" 1;
-      /* subtle terminal-like glow */
+      font-feature-settings:"tnum" 1;
       text-shadow:0 0 6px rgba(0,255,170,0.25);
       user-select:none;
+      white-space:pre-line; /* render \n on mobile */
     }
 
-    /* Flip/tick animation when value changes */
-    .tick{
-      animation:flip 260ms ease-out;
-    }
+    /* Flip/tick animation */
+    .tick{ animation:flip 260ms ease-out; }
     @keyframes flip{
       0%{transform:rotateX(65deg) scale(0.98); opacity:0.6; filter:brightness(0.9)}
       100%{transform:rotateX(0) scale(1); opacity:1; filter:brightness(1)}
     }
 
-    /* Optional soft scanline for terminal feel (very subtle) */
+    /* Optional soft scanline */
     .overlay-wrap::after{
       content:"";
       position:absolute; inset:0;
@@ -65,12 +59,12 @@
         rgba(0,255,170,0.03), rgba(0,255,170,0.03) 1px,
         transparent 2px, transparent 4px
       );
-      pointer-events:none; border-radius:12px;
+      pointer-events:none; border-radius:16px;
       mix-blend-mode:screen;
     }
 
     @media (max-width:600px){
-      .overlay-wrap{padding:4vh 5vw;}
+      .overlay-wrap{padding:4.5vh 6vw;}
     }
   </style>
 </head>
@@ -78,35 +72,38 @@
   <!-- Background video -->
   <video id="bg" src="video/vid-bg.mp4" playsinline muted autoplay loop preload="metadata"></video>
 
-  <!-- Countdown box (only the string inside) -->
+  <!-- Countdown box (only the time string inside) -->
   <div class="overlay-wrap">
     <div id="countdown">Loading...</div>
   </div>
 
   <script>
-    // Target: 20 Feb 2026 00:00 in Stockholm (CET, UTC+1 in February)
-    // If you prefer UTC midnight, change to "2026-02-20T00:00:00Z"
+    // Target: 20 Feb 2026 00:00 Stockholm time (UTC+1 in February)
     const target = new Date("2026-02-20T00:00:00+01:00").getTime();
     const el = document.getElementById("countdown");
 
-    let lastText = "";
+    const mq = window.matchMedia("(max-width: 600px)");
+    let multiline = mq.matches;
+    mq.addEventListener ? mq.addEventListener("change", e => { multiline = e.matches; lastText=""; update(); })
+                        : mq.addListener(e => { multiline = e.matches; lastText=""; update(); });
 
-    function fmt(days, hours, minutes, seconds){
-      return `${days} days, ${hours} hours, ${minutes} minutes, ${seconds} seconds`;
+    function format(days, hours, minutes, seconds){
+      if (multiline){
+        // Mobile: each on its own line
+        return `${days} days,\n${hours} hours,\n${minutes} minutes,\n${seconds} seconds`;
+      } else {
+        // Desktop: single line
+        return `${days} days, ${hours} hours, ${minutes} minutes, ${seconds} seconds`;
+      }
     }
 
+    let lastText = "";
     function update(){
       const now = Date.now();
       let diff = target - now;
 
       if (diff <= 0){
-        const txt = fmt(0,0,0,0);
-        if (txt !== lastText){
-          el.textContent = txt;
-          el.classList.add("tick");
-          requestAnimationFrame(()=> el.classList.remove("tick"));
-          lastText = txt;
-        }
+        setText(format(0,0,0,0));
         return;
       }
 
@@ -118,27 +115,24 @@
       diff %= (1000*60);
       const s = Math.floor(diff / 1000);
 
-      const txt = fmt(d,h,m,s);
+      setText(format(d,h,m,s));
+    }
+
+    function setText(txt){
       if (txt !== lastText){
-        el.textContent = txt;
+        el.textContent = txt;              // preserves pure text; \n becomes line breaks via CSS
         el.classList.add("tick");
-        // remove the class next frame so it can retrigger on each change
         requestAnimationFrame(()=> el.classList.remove("tick"));
         lastText = txt;
       }
     }
 
-    // Start
+    // Align the first tick to the next whole second
     update();
-    // Use a precise ticking loop aligned to second boundaries
-    function startTick(){
+    (function startTick(){
       const ms = 1000 - (Date.now() % 1000);
-      setTimeout(()=>{
-        update();
-        setInterval(update, 1000);
-      }, ms);
-    }
-    startTick();
+      setTimeout(()=>{ update(); setInterval(update, 1000); }, ms);
+    })();
 
     // Ensure background video plays silently
     const bg = document.getElementById('bg');
